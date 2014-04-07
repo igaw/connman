@@ -1,0 +1,30 @@
+language: c
+os: linux
+compiler: gcc
+sudo: required
+dist: bionic
+
+before_install:
+  - sudo apt-get update -qq
+  - sudo apt-get install libopenconnect-dev openconnect openvpn vpnc
+  - sudo apt-get install libdbus-1-dev
+  - sudo apt-get install libmnl-dev libnftnl-dev iptables-dev
+
+env:
+  global:
+   # The next declration is the encrypted COVERITY_SCAN_TOKEN, created
+   #   via the "travis encrypt" command using the project repo's public key
+   - secure: "erS5erg1170RvUozGFaPxVxg2Nfybr+NzVCXbwAsya+M5VWuDRIw1WXHcbGGYAK81h2nrIz8qZGy4PFt/pnFcPBrBLmzDaVm2ohgCE6KDBHq8uPjMtk+NlGsWpcc08J7ctW4gnIznVDwpYo72MPQnVvuxOgGAeyBOpBUhrdCj8Y="
+
+addons:
+  coverity_scan:
+    project:
+      name: "igaw/connman"
+      description: "The ConnMan project provides a daemon for managing internet connections within embedded devices running the Linux operating system. The Connection Manager is designed to be slim and to use as few resources as possible, so it can be easily integrated. It is a fully modular system that can be extended, through plug-ins, to support all kinds of wired or wireless technologies. Also, configuration methods, like DHCP and domain name resolving, are implemented using plug-ins. The plug-in approach allows for easy adaption and modification for various use cases."
+    notification_email: wagi@monom.org
+    build_command_prepend: "./bootstrap-configure"
+    build_command: "make"
+    branch_pattern: coverity_scan
+
+script:
+  - make
