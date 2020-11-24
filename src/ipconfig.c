@@ -258,90 +258,90 @@ static const char *scope2str(unsigned char scope)
 	return "";
 }
 
-static bool get_ipv6_state(gchar *ifname)
+static int sys_get_int(const char *path, int *val)
 {
-	int disabled;
-	gchar *path;
 	FILE *f;
-	bool enabled = false;
-
-	if (!ifname)
-		path = g_strdup("/proc/sys/net/ipv6/conf/all/disable_ipv6");
-	else
-		path = g_strdup_printf(
-			"/proc/sys/net/ipv6/conf/%s/disable_ipv6", ifname);
-
-	if (!path)
-		return enabled;
+	int err;
 
 	f = fopen(path, "r");
+	if (!f)
+		return -errno;
 
-	g_free(path);
+	err = fscanf(f, "%d", val);
+	fclose(f);
 
-	if (f) {
-		if (fscanf(f, "%d", &disabled) > 0)
-			enabled = !disabled;
-		fclose(f);
-	}
-
-	return enabled;
+	DBG("%s %d", path, *val);
+	return err;
 }
 
-static void set_ipv6_state(gchar *ifname, bool enable)
+static int sys_set_int(const char *path, int val)
 {
-	gchar *path;
 	FILE *f;
-
-	if (!ifname)
-		path = g_strdup("/proc/sys/net/ipv6/conf/all/disable_ipv6");
-	else
-		path = g_strdup_printf(
-			"/proc/sys/net/ipv6/conf/%s/disable_ipv6", ifname);
-
-	if (!path)
-		return;
+	int err;
 
 	f = fopen(path, "r+");
-
-	g_free(path);
-
 	if (!f)
-		return;
+		return -errno;
 
-	if (!enable)
-		fprintf(f, "1");
-	else
-		fprintf(f, "0");
-
+	err = fprintf(f, "%d", val);
 	fclose(f);
+
+	DBG("%s %d", path, val);
+	return err;
 }
 
-static int get_ipv6_privacy(gchar *ifname)
+static int sys_ifname_get_int(const char *base_path, const char *ifname,
+			const char *feature, int *val)
 {
-	gchar *path;
-	FILE *f;
-	int value;
+	char *path;
+	int err;
 
-	if (!ifname)
-		return 0;
-
-	path = g_strdup_printf("/proc/sys/net/ipv6/conf/%s/use_tempaddr",
-								ifname);
-
-	if (!path)
-		return 0;
-
-	f = fopen(path, "r");
-
+	path = g_strdup_printf("%s/%s/%s", base_path, ifname, feature);
+	err = sys_get_int(path, val);
 	g_free(path);
 
-	if (!f)
+	return err;
+}
+
+static int sys_ifname_set_int(const char *base_path, const char *ifname,
+				const char *feature, int val)
+{
+	char *path;
+	int err;
+
+	path = g_strdup_printf("%s/%s/%s", base_path, ifname, feature);
+	err = sys_set_int(path, val);
+	g_free(path);
+
+	return err;
+}
+
+#define SYS_IPV6_PATH "/proc/sys/net/ipv6/conf"
+
+static bool get_ipv6_state(char *ifname)
+{
+	int disabled;
+
+	if (sys_ifname_get_int(SYS_IPV6_PATH, ifname,
+				"disable_ipv6", &disabled) < 0)
+		return false;
+
+	return !disabled;
+}
+
+static void set_ipv6_state(char *ifname, bool enable)
+{
+	sys_ifname_set_int(SYS_IPV6_PATH, ifname,
+				"disabled_ipv6", !enable);
+}
+
+static int get_ipv6_privacy(char *ifname)
+{
+	int value;
+
+	if (sys_ifname_get_int(SYS_IPV6_PATH, ifname,
+				"use_tempaddr", &value) < 0)
 		return 0;
-
-	if (fscanf(f, "%d", &value) <= 0)
-		value = 0;
-
-	fclose(f);
 
 	return value;
 }
@@ -349,62 +349,28 @@ static int get_ipv6_privacy(gchar *ifname)
 /* Enable the IPv6 privacy extension for stateless address autoconfiguration.
  * The privacy extension is described in RFC 3041 and RFC 4941
  */
-static void set_ipv6_privacy(gchar *ifname, int value)
+static void set_ipv6_privacy(char *ifname, int value)
 {
-	gchar *path;
-	FILE *f;
-
-	if (!ifname)
-		return;
-
-	path = g_strdup_printf("/proc/sys/net/ipv6/conf/%s/use_tempaddr",
-								ifname);
-
-	if (!path)
-		return;
-
 	if (value < 0)
 		value = 0;
 
-	f = fopen(path, "r+");
-
-	g_free(path);
-
-	if (!f)
-		return;
-
-	fprintf(f, "%d", value);
-	fclose(f);
+	sys_ifname_set_int(SYS_IPV6_PATH, ifname,
+				"use_tempaddr", value);
 }
 
 static int get_rp_filter(void)
 {
-	FILE *f;
 	int value = -EINVAL, tmp;
 
-	f = fopen("/proc/sys/net/ipv4/conf/all/rp_filter", "r");
-
-	if (f) {
-		if (fscanf(f, "%d", &tmp) == 1)
-			value = tmp;
-		fclose(f);
-	}
+	if (sys_get_int("/proc/sys/net/ipv4/conf/all/rp_filter", &tmp) > 0)
+		value = tmp;
 
 	return value;
 }
 
 static void set_rp_filter(int value)
 {
-	FILE *f;
-
-	f = fopen("/proc/sys/net/ipv4/conf/all/rp_filter", "r+");
-
-	if (!f)
-		return;
-
-	fprintf(f, "%d", value);
-
-	fclose(f);
+	sys_set_int("/proc/sys/net/ipv4/conf/all/rp_filter", value);
 }
 
 int __connman_ipconfig_set_rp_filter()
