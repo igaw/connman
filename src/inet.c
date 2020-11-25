@@ -1809,7 +1809,7 @@ int __connman_inet_ipv6_send_rs(int index, int timeout,
 	if (sk < 0)
 		return -errno;
 
-	DBG("sock %d", sk);
+	DBG("index %d sock %d", index, sk);
 
 	ICMP6_FILTER_SETBLOCKALL(&filter);
 	ICMP6_FILTER_SETPASS(ND_ROUTER_ADVERT, &filter);
