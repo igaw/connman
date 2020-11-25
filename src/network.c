@@ -748,6 +748,8 @@ static void check_dhcpv6(struct in6_addr *src_addr,
 	struct connman_network *network = user_data;
 	struct connman_service *service;
 	GSList *prefixes;
+	struct connman_ipconfig *ipconfig;
+	char buf[INET6_ADDRSTRLEN];
 
 	DBG("reply %p", reply);
 
@@ -780,7 +782,6 @@ static void check_dhcpv6(struct in6_addr *src_addr,
 	}
 
 	prefixes = __connman_inet_ipv6_get_prefixes(reply, length);
-
 	/*
 	 * If IPv6 config is missing from service, then create it.
 	 * The ipconfig might be missing if we got a rtnl message
@@ -792,6 +793,18 @@ static void check_dhcpv6(struct in6_addr *src_addr,
 	service = connman_service_lookup_from_network(network);
 	if (service) {
 		connman_service_create_ip6config(service, network->index);
+
+		/*
+		 * router lifetime: anything other than a zero value
+		 * means the source sending the RA will be the default
+		 * gateway. Note, it is a link-local address and not
+		 * global unique address.
+		 */
+		if (reply->nd_ra_router_lifetime &&
+				inet_ntop(AF_INET6, src_addr, buf, INET6_ADDRSTRLEN)) {
+			ipconfig = __connman_service_get_ip6config(service);
+			__connman_ipconfig_set_gateway(ipconfig, buf);
+		}
 
 		connman_network_set_associating(network, false);
 
