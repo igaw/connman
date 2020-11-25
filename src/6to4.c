@@ -375,7 +375,8 @@ error:
 	return -1;
 }
 
-static void receive_rs_reply(struct nd_router_advert *reply,
+static void receive_rs_reply(struct in6_addr *src_addr,
+			struct nd_router_advert *reply,
 			unsigned int length, void *user_data)
 {
 	char *address = user_data;

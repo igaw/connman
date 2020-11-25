@@ -170,7 +170,8 @@ bool __connman_inet_is_any_addr(const char *address, int family);
 #include <netinet/ip6.h>
 #include <netinet/icmp6.h>
 
-typedef void (*__connman_inet_rs_cb_t) (struct nd_router_advert *reply,
+typedef void (*__connman_inet_rs_cb_t) (struct in6_addr *src_addr,
+					struct nd_router_advert *reply,
 					unsigned int length, void *user_data);
 
 int __connman_inet_ipv6_send_rs(int index, int timeout,

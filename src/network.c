@@ -741,7 +741,8 @@ static void dhcpv6_callback(struct connman_network *network,
 		stop_dhcpv6(network);
 }
 
-static void check_dhcpv6(struct nd_router_advert *reply,
+static void check_dhcpv6(struct in6_addr *src_addr,
+			struct nd_router_advert *reply,
 			unsigned int length, void *user_data)
 {
 	struct connman_network *network = user_data;
@@ -816,7 +817,8 @@ static void check_dhcpv6(struct nd_router_advert *reply,
 	connman_network_unref(network);
 }
 
-static void receive_refresh_rs_reply(struct nd_router_advert *reply,
+static void receive_refresh_rs_reply(struct in6_addr *src_addr,
+		struct nd_router_advert *reply,
 		unsigned int length, void *user_data)
 {
 	struct connman_network *network = user_data;

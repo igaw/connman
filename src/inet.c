@@ -1518,7 +1518,7 @@ static gboolean rs_timeout_cb(gpointer user_data)
 
 	if (data->callback) {
 		__connman_inet_rs_cb_t cb = data->callback;
-		cb(NULL, 0, data->user_data);
+		cb(NULL, NULL, 0, data->user_data);
 	}
 
 	data->timeout = 0;
@@ -1552,7 +1552,7 @@ static int icmpv6_recv(int fd, struct xs_cb_data *data)
 
 	len = recvmsg(fd, &mhdr, 0);
 	if (len < 0) {
-		cb(NULL, 0, data->user_data);
+		cb(NULL, NULL, 0, data->user_data);
 		return -errno;
 	}
 
@@ -1562,7 +1562,7 @@ static int icmpv6_recv(int fd, struct xs_cb_data *data)
 	if (hdr->nd_ra_code != 0)
 		return 0;
 
-	cb(hdr, len, data->user_data);
+	cb(&saddr.sin6_addr, hdr, len, data->user_data);
 
 	return len;
 }
