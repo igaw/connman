@@ -634,15 +634,23 @@ static void set_address(int ifindex, struct connman_ipconfig *ipconfig,
 	if (address && ((c_address && g_strcmp0(address, c_address) != 0) ||
 								!c_address)) {
 		int prefix_len;
+		char *gw;
 
 		/* Is this prefix part of the subnet we are suppose to use? */
 		prefix_len = check_ipv6_addr_prefix(prefixes, address);
 
+		gw = (char *)__connman_ipconfig_get_gateway(ipconfig);
+		if (gw)
+			gw = g_strdup(gw);
+
 		__connman_ipconfig_address_remove(ipconfig);
 		__connman_ipconfig_set_local(ipconfig, address);
 		__connman_ipconfig_set_prefixlen(ipconfig, prefix_len);
+		__connman_ipconfig_set_gateway(ipconfig, gw);
 
-		DBG("new address %s/%d", address, prefix_len);
+		DBG("new address %s/%d gw %s", address, prefix_len, gw);
+
+		g_free(gw);
 
 		__connman_ipconfig_set_dhcp_address(ipconfig, address);
 		__connman_service_save(
