@@ -3153,8 +3153,6 @@ static int iproute_default_modify(int cmd, uint32_t table_id, int ifindex,
 	int family = connman_inet_check_ipaddress(gateway);
 	char *dst = NULL;
 
-	DBG("gateway %s/%u table %u", gateway, prefixlen, table_id);
-
 	switch (family) {
 	case AF_INET:
 		len = 4;
@@ -3226,6 +3224,7 @@ int __connman_inet_add_default_to_table(uint32_t table_id, int ifindex,
 {
 	/* ip route add default via 1.2.3.4 dev wlan0 table 1234 */
 
+	DBG("table %d index %d gw %s", table_id, ifindex, gateway);
 	return iproute_default_modify(RTM_NEWROUTE, table_id, ifindex, gateway, 0);
 }
 
@@ -3233,6 +3232,8 @@ int __connman_inet_add_subnet_to_table(uint32_t table_id, int ifindex,
 						const char *gateway, unsigned char prefixlen)
 {
 	/* ip route add 1.2.3.4/24 dev eth0 table 1234 */
+
+	DBG("table %d index %d gw %s/%d", table_id, ifindex, gateway, prefixlen);
 	return iproute_default_modify(RTM_NEWROUTE, table_id, ifindex, gateway, prefixlen);
 }
 
@@ -3241,6 +3242,7 @@ int __connman_inet_del_default_from_table(uint32_t table_id, int ifindex,
 {
 	/* ip route del default via 1.2.3.4 dev wlan0 table 1234 */
 
+	DBG("table %d index %d gw %s", table_id, ifindex, gateway);
 	return iproute_default_modify(RTM_DELROUTE, table_id, ifindex, gateway, 0);
 }
 
@@ -3248,6 +3250,8 @@ int __connman_inet_del_subnet_from_table(uint32_t table_id, int ifindex,
 						const char *gateway, unsigned char prefixlen)
 {
 	/* ip route del 1.2.3.4/24 dev eth0 table 1234 */
+
+	DBG("table %d index %d gw %s/%d", table_id, ifindex, gateway, prefixlen);
 	return iproute_default_modify(RTM_DELROUTE, table_id, ifindex, gateway, prefixlen);
 }
 
