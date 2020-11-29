@@ -27,6 +27,7 @@
 #include <errno.h>
 #include <string.h>
 #include <net/if.h>
+#include <stdio.h>
 
 #include <gdbus.h>
 
@@ -52,6 +53,25 @@ struct gateway_data {
 };
 
 static GHashTable *gateway_hash = NULL;
+
+#define MAX_GW2STR_BUF 1024
+static const char *gw2str(struct gateway_data *gw)
+{
+	static char buf[MAX_GW2STR_BUF];
+
+	if (!gw) {
+		snprintf(buf, MAX_GW2STR_BUF - 1, "n/a");
+	} else {
+		snprintf(buf, MAX_GW2STR_BUF - 1,
+			"service %p index %d ipv4 %s ipv6 %s",
+			gw->service, gw->index,
+			gw->ipv4_gateway ? gw->ipv4_gateway->gateway : "n/a",
+			gw->ipv6_gateway ? gw->ipv6_gateway->gateway : "n/a");
+		buf[MAX_GW2STR_BUF - 1] = '\0';
+	}
+
+	return buf;
+}
 
 static struct gateway_config *find_gateway(int index, const char *gateway)
 {
@@ -401,8 +421,7 @@ static struct gateway_data *add_gateway(struct connman_service *service,
 	 */
 	old = g_hash_table_lookup(gateway_hash, service);
 	if (old) {
-		DBG("Replacing gw %p ipv4 %p ipv6 %p", old,
-			old->ipv4_gateway, old->ipv6_gateway);
+		DBG("Replacing %s", gw2str(old));
 		disable_gateway(old, type);
 		if (type == CONNMAN_IPCONFIG_TYPE_IPV4) {
 			data->ipv6_gateway = old->ipv6_gateway;
@@ -433,8 +452,7 @@ static void set_default_gateway(struct gateway_data *data,
 	else
 		do_ipv4 = do_ipv6 = true;
 
-	DBG("type %d gateway ipv4 %p ipv6 %p", type, data->ipv4_gateway,
-						data->ipv6_gateway);
+	DBG("type %d %s", type, gw2str(data));
 
 	if (do_ipv4 && data->ipv4_gateway &&
 					data->ipv4_gateway->vpn) {
@@ -514,8 +532,7 @@ static void unset_default_gateway(struct gateway_data *data,
 	else
 		do_ipv4 = do_ipv6 = true;
 
-	DBG("type %d gateway ipv4 %p ipv6 %p", type, data->ipv4_gateway,
-						data->ipv6_gateway);
+	DBG("type %d gateway %s", type, gw2str(data));
 
 	if (do_ipv4 && data->ipv4_gateway &&
 					data->ipv4_gateway->vpn) {
@@ -594,7 +611,7 @@ static bool choose_default_gateway(struct gateway_data *data,
 	if (data->ipv4_gateway && candidate->ipv4_gateway) {
 
 		if (!candidate->ipv4_gateway->active) {
-			DBG("ipv4 downgrading %p", candidate);
+			DBG("ipv4 downgrading %s", gw2str(candidate));
 			unset_default_gateway(candidate,
 						CONNMAN_IPCONFIG_TYPE_IPV4);
 		}
@@ -602,7 +619,7 @@ static bool choose_default_gateway(struct gateway_data *data,
 		if (candidate->ipv4_gateway->active &&
 				__connman_service_compare(candidate->service,
 							data->service) < 0) {
-			DBG("ipv4 downgrading this %p", data);
+			DBG("ipv4 downgrading this %s", gw2str(data));
 			unset_default_gateway(data, CONNMAN_IPCONFIG_TYPE_IPV4);
 			downgraded = true;
 		}
@@ -610,7 +627,7 @@ static bool choose_default_gateway(struct gateway_data *data,
 
 	if (data->ipv6_gateway && candidate->ipv6_gateway) {
 		if (!candidate->ipv6_gateway->active) {
-			DBG("ipv6 downgrading %p", candidate);
+			DBG("ipv6 downgrading %s", gw2str(candidate));
 			unset_default_gateway(candidate,
 						CONNMAN_IPCONFIG_TYPE_IPV6);
 		}
@@ -618,7 +635,7 @@ static bool choose_default_gateway(struct gateway_data *data,
 		if (candidate->ipv6_gateway->active &&
 			__connman_service_compare(candidate->service,
 						data->service) < 0) {
-			DBG("ipv6 downgrading this %p", data);
+			DBG("ipv6 downgrading this %s", gw2str(data));
 			unset_default_gateway(data, CONNMAN_IPCONFIG_TYPE_IPV6);
 			downgraded = true;
 		}
@@ -634,8 +651,6 @@ static void connection_newgateway(int index, const char *gateway)
 	GHashTableIter iter;
 	gpointer value, key;
 	bool found = false;
-
-	DBG("index %d gateway %s", index, gateway);
 
 	config = find_gateway(index, gateway);
 	if (!config)
@@ -654,6 +669,8 @@ static void connection_newgateway(int index, const char *gateway)
 
 	if (data->default_checked)
 		return;
+
+	DBG("%s", gw2str(data));
 
 	/*
 	 * The next checks are only done once, otherwise setting
@@ -688,7 +705,7 @@ static void remove_gateway(gpointer user_data)
 {
 	struct gateway_data *data = user_data;
 
-	DBG("gateway ipv4 %p ipv6 %p", data->ipv4_gateway, data->ipv6_gateway);
+	DBG("%s", gw2str(data));
 
 	if (data->ipv4_gateway) {
 		g_free(data->ipv4_gateway->gateway);
@@ -714,13 +731,14 @@ static void connection_delgateway(int index, const char *gateway)
 	struct gateway_config *config;
 	struct gateway_data *data;
 
-	DBG("index %d gateway %s", index, gateway);
-
 	config = find_gateway(index, gateway);
 	if (config)
 		config->active = false;
 
 	data = find_default_gateway();
+
+	DBG("%s", gw2str(data));
+
 	if (data)
 		set_default_gateway(data, CONNMAN_IPCONFIG_TYPE_ALL);
 }
@@ -838,8 +856,7 @@ int __connman_connection_gateway_add(struct connman_service *service,
 
 	active_gateway = find_active_gateway();
 
-	DBG("active %p index %d new %p", active_gateway,
-		active_gateway ? active_gateway->index : -1, new_gateway);
+	DBG("active %s", gw2str(active_gateway));
 
 	if (type == CONNMAN_IPCONFIG_TYPE_IPV4 &&
 				new_gateway->ipv4_gateway) {
@@ -916,8 +933,6 @@ void __connman_connection_gateway_remove(struct connman_service *service,
         bool do_ipv4 = false, do_ipv6 = false;
 	int err;
 
-	DBG("service %p type %d", service, type);
-
 	if (type == CONNMAN_IPCONFIG_TYPE_IPV4)
 		do_ipv4 = true;
 	else if (type == CONNMAN_IPCONFIG_TYPE_IPV6)
@@ -937,10 +952,7 @@ void __connman_connection_gateway_remove(struct connman_service *service,
 	if (do_ipv6 && data->ipv6_gateway)
 		set_default6 = data->ipv6_gateway->vpn;
 
-	DBG("ipv4 gateway %s ipv6 gateway %s vpn %d/%d",
-		data->ipv4_gateway ? data->ipv4_gateway->gateway : "<null>",
-		data->ipv6_gateway ? data->ipv6_gateway->gateway : "<null>",
-		set_default4, set_default6);
+	DBG("%s vpn %d/%d", gw2str(data), set_default4, set_default6);
 
 	if (do_ipv4 && data->ipv4_gateway &&
 			data->ipv4_gateway->vpn && data->index >= 0)
@@ -994,7 +1006,7 @@ bool __connman_connection_update_gateway(void)
 
 	default_gateway = find_default_gateway();
 
-	DBG("default %p", default_gateway);
+	DBG("%s", gw2str(default_gateway));
 
 	/*
 	 * There can be multiple active gateways so we need to
