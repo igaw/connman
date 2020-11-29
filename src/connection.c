@@ -504,13 +504,13 @@ static void set_default_gateway(struct gateway_data *data,
 		goto done;
 	}
 
-	if (do_ipv6 && data->ipv6_gateway)
-		status6 = __connman_inet_add_default_to_table(RT_TABLE_MAIN,
-					index, data->ipv6_gateway->gateway);
-
 	if (do_ipv4 && data->ipv4_gateway)
 		status4 = __connman_inet_add_default_to_table(RT_TABLE_MAIN,
 					index, data->ipv4_gateway->gateway);
+
+	if (do_ipv6 && data->ipv6_gateway)
+		status6 = __connman_inet_add_default_to_table(RT_TABLE_MAIN,
+					index, data->ipv6_gateway->gateway);
 
 	if (status4 < 0 || status6 < 0)
 		return;
@@ -578,13 +578,13 @@ static void unset_default_gateway(struct gateway_data *data,
 		return;
 	}
 
-	if (do_ipv6 && data->ipv6_gateway)
-		connman_inet_clear_ipv6_gateway_address(index,
-						data->ipv6_gateway->gateway);
-
 	if (do_ipv4 && data->ipv4_gateway)
 		connman_inet_clear_gateway_address(index,
 						data->ipv4_gateway->gateway);
+
+	if (do_ipv6 && data->ipv6_gateway)
+		connman_inet_clear_gateway_address(index,
+                                                data->ipv6_gateway->gateway);
 }
 
 static struct gateway_data *find_default_gateway(void)
