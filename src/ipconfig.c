@@ -84,6 +84,7 @@ struct connman_ipdevice {
 	bool ipv6_enabled;
 	int ipv6_privacy;
 	bool ipv6_accept_ra;
+	bool ipv6_accept_ra_defrtr;
 };
 
 struct ipconfig_store {
@@ -376,6 +377,23 @@ static void set_ipv6_accept_ra(char *ifname, int value)
 				"accept_ra", value);
 }
 
+static int get_ipv6_accept_ra_defrtr(char *ifname)
+{
+	int value;
+
+	if (sys_ifname_get_int(SYS_IPV6_PATH, ifname,
+				"accept_ra_defrtr", &value) < 0)
+		return 0;
+
+	return value;
+}
+
+static void set_ipv6_accept_ra_defrtr(char *ifname, int value)
+{
+	sys_ifname_set_int(SYS_IPV6_PATH, ifname,
+				"accept_ra_defrtr", value);
+}
+
 static int get_rp_filter(void)
 {
 	int value = -EINVAL, tmp;
@@ -472,6 +490,7 @@ static void free_ipdevice(gpointer data)
 		set_ipv6_state(ifname, ipdevice->ipv6_enabled);
 		set_ipv6_privacy(ifname, ipdevice->ipv6_privacy);
 		set_ipv6_accept_ra(ifname, ipdevice->ipv6_accept_ra);
+		set_ipv6_accept_ra_defrtr(ifname, ipdevice->ipv6_accept_ra_defrtr);
 	}
 
 	g_free(ifname);
@@ -550,6 +569,7 @@ void __connman_ipconfig_newlink(int index, unsigned short type,
 	ipdevice->ipv6_enabled = get_ipv6_state(ifname);
 	ipdevice->ipv6_privacy = get_ipv6_privacy(ifname);
 	ipdevice->ipv6_accept_ra = get_ipv6_accept_ra(ifname);
+	ipdevice->ipv6_accept_ra_defrtr = get_ipv6_accept_ra_defrtr(ifname);
 
 	ipdevice->address = g_strdup(address);
 
@@ -1591,6 +1611,7 @@ static void enable_ipv6(struct connman_ipconfig *ipconfig)
 
 	set_ipv6_state(ifname, true);
 	set_ipv6_accept_ra(ifname, false);
+	set_ipv6_accept_ra_defrtr(ifname, true);
 
 	g_free(ifname);
 }
