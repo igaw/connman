@@ -613,9 +613,6 @@ static void process_newaddr(unsigned char family, unsigned char prefixlen,
 		src = &ipv4_addr;
 	} else if (family == AF_INET6) {
 		extract_ipv6_addr(msg, bytes, &ipv6_address, &ipv6_local);
-		if (IN6_IS_ADDR_LINKLOCAL(&ipv6_address))
-			return;
-
 		src = &ipv6_address;
 	} else {
 		return;
@@ -653,9 +650,6 @@ static void process_deladdr(unsigned char family, unsigned char prefixlen,
 		src = &ipv4_addr;
 	} else if (family == AF_INET6) {
 		extract_ipv6_addr(msg, bytes, &ipv6_address, &ipv6_local);
-		if (IN6_IS_ADDR_LINKLOCAL(&ipv6_address))
-			return;
-
 		src = &ipv6_address;
 	} else {
 		return;
