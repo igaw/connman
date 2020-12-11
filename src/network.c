@@ -745,6 +745,23 @@ static void dhcpv6_callback(struct connman_network *network,
 		stop_dhcpv6(network);
 }
 
+static int autoconf_ipv6_finish(struct connman_network *network, GSList *prefixes)
+{
+	GSList *list;
+
+	DBG("network %p", network);
+
+	for (list = prefixes; list; list = list->next) {
+		char *elem = list->data;
+		DBG("prefix %s", elem);
+	}
+
+	//__connman_ipconfig_set_dhcpv6_prefixes(ipconfig, array);
+	dhcpv6_set_addresses(network);
+
+	return 0;
+}
+
 static void check_dhcpv6(struct in6_addr *src_addr,
 			struct nd_router_advert *reply,
 			unsigned int length, void *user_data)
@@ -821,11 +838,17 @@ static void check_dhcpv6(struct in6_addr *src_addr,
 	 * We do stateful/stateless DHCPv6 if router advertisement says so.
 	 */
 	if (reply->nd_ra_flags_reserved & ND_RA_FLAG_MANAGED) {
+		DBG("XXX managed");
 		__connman_dhcpv6_start(network, prefixes, dhcpv6_callback);
 	} else {
-		if (reply->nd_ra_flags_reserved & ND_RA_FLAG_OTHER)
+		if (reply->nd_ra_flags_reserved & ND_RA_FLAG_OTHER) {
+			DBG("XXX other");
 			__connman_dhcpv6_start_info(network,
 							dhcpv6_info_callback);
+		} else {
+			DBG("XXX SLAAC");
+			autoconf_ipv6_finish(network, prefixes);
+		}
 
 		g_slist_free_full(prefixes, g_free);
 		network->connecting = false;
