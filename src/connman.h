@@ -373,6 +373,7 @@ const char *__connman_ipconfig_get_gateway_from_index(int index,
 	enum connman_ipconfig_type type);
 void __connman_ipconfig_set_index(struct connman_ipconfig *ipconfig, int index);
 
+const char *__connman_ipconfig_get_ipv6_ll(struct connman_ipconfig *ipconfig);
 const char *__connman_ipconfig_get_local(struct connman_ipconfig *ipconfig);
 void __connman_ipconfig_set_local(struct connman_ipconfig *ipconfig, const char *address);
 const char *__connman_ipconfig_get_peer(struct connman_ipconfig *ipconfig);

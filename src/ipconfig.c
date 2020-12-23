@@ -1087,6 +1087,31 @@ void __connman_ipconfig_set_index(struct connman_ipconfig *ipconfig, int index)
 	ipconfig->index = index;
 }
 
+const char *__connman_ipconfig_get_ipv6_ll(struct connman_ipconfig *ipconfig)
+{
+	GSList *list;
+	struct connman_ipdevice *ipdevice;
+
+	ipdevice = g_hash_table_lookup(ipdevice_hash,
+				GINT_TO_POINTER(ipconfig->index));
+	if (!ipdevice)
+		return NULL;
+
+	for (list = ipdevice->address_list; list; list = list->next) {
+		struct connman_ipaddress *ipaddress = list->data;
+
+		if (ipaddress->family != AF_INET6)
+			continue;
+		if (!ipaddress->local)
+			continue;
+		if (strncmp(ipaddress->local, "fe80::", strlen("fe80::")))
+			continue;
+
+		return ipaddress->local;
+	}
+	return NULL;
+}
+
 const char *__connman_ipconfig_get_local(struct connman_ipconfig *ipconfig)
 {
 	if (!ipconfig->address)

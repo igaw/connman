@@ -745,15 +745,94 @@ static void dhcpv6_callback(struct connman_network *network,
 		stop_dhcpv6(network);
 }
 
+static void get_random_bytes(unsigned char *buf, int length)
+{
+	uint64_t rand;
+	int i;
+
+	for (i = 0; i < length-1; i++) {
+		__connman_util_get_random(&rand);
+		buf[i] = (unsigned char)rand;
+	}
+}
+
+/* Generation of a randomized Interface Identifier
+ * draft-ietf-6man-rfc4941bis, Section 3.3.1
+ */
+
+static void ipv6_gen_rnd_iid(struct in6_addr *addr)
+{
+regen:
+	get_random_bytes(&addr->s6_addr[8], 8);
+
+	/* <draft-ietf-6man-rfc4941bis-08.txt>, Section 3.3.1:
+	 * check if generated address is not inappropriate:
+	 *
+	 * - Reserved IPv6 Interface Identifers
+	 * - XXX: already assigned to an address on the device
+	 */
+
+	/* Subnet-router anycast: 0000:0000:0000:0000 */
+	if (!(addr->s6_addr32[2] | addr->s6_addr32[3]))
+		goto regen;
+
+	/* IANA Ethernet block: 0200:5EFF:FE00:0000-0200:5EFF:FE00:5212
+	 * Proxy Mobile IPv6:   0200:5EFF:FE00:5213
+	 * IANA Ethernet block: 0200:5EFF:FE00:5214-0200:5EFF:FEFF:FFFF
+	 */
+	if (ntohl(addr->s6_addr32[2]) == 0x02005eff &&
+	    (ntohl(addr->s6_addr32[3]) & 0Xff000000) == 0xfe000000)
+		goto regen;
+
+	/* Reserved subnet anycast addresses */
+	if (ntohl(addr->s6_addr32[2]) == 0xfdffffff &&
+	    ntohl(addr->s6_addr32[3]) >= 0Xffffff80)
+		goto regen;
+}
+
+
 static int autoconf_ipv6_finish(struct connman_network *network, GSList *prefixes)
 {
+	struct connman_ipconfig *ipconfig;
+	struct connman_service *service;
 	GSList *list;
+	const char *ipv6ll;
+	unsigned char buf_ll[sizeof(struct in6_addr)];
+	unsigned char buf_p[sizeof(struct in6_addr)];
+	char str[INET6_ADDRSTRLEN];
 
 	DBG("network %p", network);
 
+	service = connman_service_lookup_from_network(network);
+	ipconfig = __connman_service_get_ip6config(service);
+	ipv6ll = __connman_ipconfig_get_ipv6_ll(ipconfig);
+
+	DBG("ipv6 ll %s", ipv6ll);
+	if (inet_pton(AF_INET6, ipv6ll, buf_ll) != 1)
+		return -EINVAL;
+
 	for (list = prefixes; list; list = list->next) {
-		char *elem = list->data;
-		DBG("prefix %s", elem);
+		char **elems = g_strsplit(list->data, "/", 0);
+
+		if (!elems)
+			continue;
+
+		if (inet_pton(AF_INET6, elems[0], buf_p) != 1) {
+			g_strfreev(elems);
+			return -EINVAL;
+		}
+
+		ipv6_gen_rnd_iid((struct in6_addr *)buf_p);
+		if (!inet_ntop(AF_INET6, buf_p, str, INET6_ADDRSTRLEN)) {
+			g_strfreev(elems);
+			return -errno;
+		}
+		DBG("%s/64", str);
+		__connman_ipconfig_set_local(ipconfig, str);
+		__connman_ipconfig_set_prefixlen(ipconfig, 64);
+
+		g_strfreev(elems);
+		break;
 	}
 
 	//__connman_ipconfig_set_dhcpv6_prefixes(ipconfig, array);
