@@ -175,6 +175,7 @@ class Process:
 		self.io_watch = None
 		self.cleanup = cleanup
 		self.verbose = False
+		self.pid = None
 
 		if not namespace:
 			self.output_name = '/tmp/%s-out' % self.name
@@ -304,7 +305,7 @@ class Process:
 	def kill(self, force=False):
 		print("Killing process %s" % self.args)
 
-		if self.killed:
+		if self.killed or not self.pid:
 			return
 
 		if force:
@@ -692,6 +693,42 @@ class Namespace:
 
 		if self.is_verbose('iwd-acd'):
 			env['IWD_ACD_DEBUG'] = '1'
+
+		pid = self.start_process(args, env=env)
+		return pid
+
+	def start_connman(self, config_dir = '/tmp', storage_dir = '/tmp/connman'):
+		args = []
+
+		if self.args.valgrind:
+			args.extend(['valgrind', '--leak-check=full', '--track-origins=yes',
+						'--log-file=/tmp/valgrind.log'])
+
+		args.extend(['connmand', '-n'])
+
+		if self.is_verbose(args[0]):
+			args.append('-d')
+
+		env = os.environ.copy()
+
+		args.extend(['-c', '%s/connman.conf' % config_dir])
+		args.extend(['-D', '%s' % storage_dir])
+		args.extend(['-V', '%s-vpn' % storage_dir])
+
+		if self.is_verbose('connman-dhcp'):
+			env['CONNMAN_DHCP_DEBUG'] = '1'
+
+		if self.is_verbose('connman-dhcpv6'):
+			env['CONNMAN_DHCPV6_DEBUG'] = '1'
+
+		if self.is_verbose('connman-iptables'):
+			env['CONNMAN_IPTABLES_DEBUG'] = '1'
+
+		if self.is_verbose('connman-supplicant'):
+			env['CONNMAN_SUPPLICANT_DEBUG'] = '1'
+
+		if self.is_verbose('connman-web'):
+			env['CONNMAN_WEB_DEBUG'] = '1'
 
 		pid = self.start_process(args, env=env)
 		return pid
@@ -1327,6 +1364,7 @@ def run_tests():
 	parser.add_argument('--hw')
 	parser.add_argument('--monitor')
 	parser.add_argument('--sub_tests')
+	parser.add_argument('--iwd_src_path')
 
 	args = parser.parse_args(options)
 
@@ -1341,11 +1379,16 @@ def run_tests():
 		args.verbose = args.verbose.split(',')
 
 	os.environ['PATH'] = '%s/src' % args.testhome
-	os.environ['PATH'] += ':%s/tools' % args.testhome
-	os.environ['PATH'] += ':%s/client' % args.testhome
-	os.environ['PATH'] += ':%s/monitor' % args.testhome
-	os.environ['PATH'] += ':%s/wired' % args.testhome
 	os.environ['PATH'] += ':' + args.path
+
+        # iwd paths
+	os.environ['PATH'] += ':%s/src' % args.iwd_src_path
+	os.environ['PATH'] += ':%s/tools' % args.iwd_src_path
+	os.environ['PATH'] += ':%s/client' % args.iwd_src_path
+	os.environ['PATH'] += ':%s/monitor' % args.iwd_src_path
+	os.environ['PATH'] += ':%s/wired' % args.iwd_src_path
+
+	args.path += ':%s/client' % args.iwd_src_path
 
 	sys.path.append(args.testhome + '/autotests/util')
 
@@ -1412,6 +1455,9 @@ class Main:
 		self.parser.add_argument('--sub-tests', '-S', metavar='<subtests>',
 				type=str, nargs=1, help='List of subtests to run',
 				default=None, dest='sub_tests')
+		self.parser.add_argument('--iwd-src-path', '-i', metavar='<path>',
+				type=str, nargs=1, help='Path to iwd source code',
+				default=None, dest='iwd_src_path')
 
 		# Prevent --autotest/--unittest from being used together
 		auto_unit_group = self.parser.add_mutually_exclusive_group()
@@ -1515,12 +1561,17 @@ class Main:
 		options = 'init=%s' % os.path.realpath(sys.argv[0])
 
 		# Support running from top level as well as tools
-		if os.getcwd().endswith('tools'):
+		if os.getcwd().endswith('test-runner'):
 			options += ' --testhome %s/../' % os.getcwd()
 		else:
 			options += ' --testhome %s' % os.getcwd()
 
 		options += ' --path "%s"' % os.environ['PATH']
+
+		if self.args.iwd_src_path is not None:
+			options += ' --iwd_src_path %s' % self.args.iwd_src_path
+		else:
+			options += ' --iwd_src_path /home/wagi/cm/iwd'
 
 		if self.args.auto_tests:
 			options += ' --auto_tests %s' % ','.join(self.args.auto_tests)
