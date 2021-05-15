@@ -37,6 +37,7 @@
 
 #include <gdbus.h>
 
+#include <connman/storage.h>
 #include "../src/connman.h"
 #include "vpn.h"
 
@@ -124,6 +125,8 @@ static void disconnect_callback(DBusConnection *conn, void *user_data)
 }
 
 static gchar *option_config = NULL;
+static gchar *option_storage_dir = NULL;
+static gchar *option_storage_vpn_dir = NULL;
 static gchar *option_debug = NULL;
 static gchar *option_plugin = NULL;
 static gchar *option_noplugin = NULL;
@@ -145,6 +148,12 @@ static GOptionEntry options[] = {
 	{ "config", 'c', 0, G_OPTION_ARG_STRING, &option_config,
 				"Load the specified configuration file "
 				"instead of " CONFIGMAINFILE, "FILE" },
+	{ "storage_dir", 'D', 0, G_OPTION_ARG_STRING, &option_storage_dir,
+				"Use DIR for persistent state information. "
+				"Default is " STORAGEDIR, "DIR" },
+	{ "storage_vpn_dir", 'V', 0, G_OPTION_ARG_STRING, &option_storage_vpn_dir,
+				"Use DIR for VPN persistent state information. "
+				"Default is " VPN_STORAGEDIR, "DIR" },
 	{ "debug", 'd', G_OPTION_FLAG_OPTIONAL_ARG,
 				G_OPTION_ARG_CALLBACK, parse_debug,
 				"Specify debug options to enable", "DEBUG" },
@@ -203,26 +212,17 @@ int main(int argc, char *argv[])
 		}
 	}
 
+	if (!option_config)
+		__vpn_settings_init(CONFIGMAINFILE);
+	else
+		__vpn_settings_init(option_config);
+
+	connman_storage_init(option_storage_dir, option_storage_vpn_dir);
+
 	if (mkdir(VPN_STATEDIR, S_IRUSR | S_IWUSR | S_IXUSR |
 				S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH) < 0) {
 		if (errno != EEXIST)
 			perror("Failed to create state directory");
-	}
-
-	/*
-	 * At some point the VPN stuff is migrated into VPN_STORAGEDIR
-	 * and this mkdir() call can be removed.
-	 */
-	if (mkdir(STORAGEDIR, S_IRUSR | S_IWUSR | S_IXUSR |
-				S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH) < 0) {
-		if (errno != EEXIST)
-			perror("Failed to create storage directory");
-	}
-
-	if (mkdir(VPN_STORAGEDIR, S_IRUSR | S_IWUSR | S_IXUSR |
-				S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH) < 0) {
-		if (errno != EEXIST)
-			perror("Failed to create VPN storage directory");
 	}
 
 	umask(0077);
@@ -248,11 +248,6 @@ int main(int argc, char *argv[])
 	__connman_log_init(argv[0], option_debug, option_detach, false,
 			"Connection Manager VPN daemon", VERSION);
 	__connman_dbus_init(conn);
-
-	if (!option_config)
-		__vpn_settings_init(CONFIGMAINFILE);
-	else
-		__vpn_settings_init(option_config);
 
 	__connman_inotify_init();
 	__connman_agent_init();

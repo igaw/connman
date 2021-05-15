@@ -35,6 +35,7 @@
 
 #include <connman/provision.h>
 #include <connman/ipaddress.h>
+#include <connman/storage.h>
 #include "connman.h"
 
 struct connman_config_service {
@@ -864,7 +865,7 @@ static int load_config(struct connman_config *config)
 	if (!load_service_from_keyfile(keyfile, config))
 		connman_warn("Config file %s/%s.config does not contain any "
 			"configuration that can be provisioned!",
-			STORAGEDIR, config->ident);
+			connman_storage_dir(), config->ident);
 
 	g_key_file_free(keyfile);
 
@@ -916,7 +917,7 @@ static int read_configs(void)
 
 	DBG("");
 
-	dir = g_dir_open(STORAGEDIR, 0, NULL);
+	dir = g_dir_open(connman_storage_dir(), 0, NULL);
 	if (dir) {
 		const gchar *file;
 
@@ -1013,7 +1014,7 @@ int __connman_config_init(void)
 	config_table = g_hash_table_new_full(g_str_hash, g_str_equal,
 						NULL, unregister_config);
 
-	connman_inotify_register(STORAGEDIR, config_notify_handler);
+	connman_inotify_register(connman_storage_dir(), config_notify_handler);
 
 	return read_configs();
 }
@@ -1024,7 +1025,7 @@ void __connman_config_cleanup(void)
 
 	cleanup = true;
 
-	connman_inotify_unregister(STORAGEDIR, config_notify_handler);
+	connman_inotify_unregister(connman_storage_dir(), config_notify_handler);
 
 	g_hash_table_destroy(config_table);
 	config_table = NULL;

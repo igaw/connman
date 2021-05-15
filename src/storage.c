@@ -27,6 +27,7 @@
 #include <unistd.h>
 #include <sys/stat.h>
 #include <dirent.h>
+#include <stdio.h>
 
 #include <connman/storage.h>
 
@@ -37,6 +38,9 @@
 
 #define MODE		(S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | \
 			S_IXGRP | S_IROTH | S_IXOTH)
+
+static char *storage_dir;
+static char *storage_vpn_dir;
 
 static GKeyFile *storage_load(const char *pathname)
 {
@@ -89,7 +93,7 @@ GKeyFile *__connman_storage_load_global(void)
 	gchar *pathname;
 	GKeyFile *keyfile = NULL;
 
-	pathname = g_strdup_printf("%s/%s", STORAGEDIR, SETTINGS);
+	pathname = g_strdup_printf("%s/%s", storage_dir, SETTINGS);
 	if (!pathname)
 		return NULL;
 
@@ -105,7 +109,7 @@ int __connman_storage_save_global(GKeyFile *keyfile)
 	gchar *pathname;
 	int ret;
 
-	pathname = g_strdup_printf("%s/%s", STORAGEDIR, SETTINGS);
+	pathname = g_strdup_printf("%s/%s", storage_dir, SETTINGS);
 	if (!pathname)
 		return -ENOMEM;
 
@@ -120,7 +124,7 @@ void __connman_storage_delete_global(void)
 {
 	gchar *pathname;
 
-	pathname = g_strdup_printf("%s/%s", STORAGEDIR, SETTINGS);
+	pathname = g_strdup_printf("%s/%s", storage_dir, SETTINGS);
 	if (!pathname)
 		return;
 
@@ -134,7 +138,7 @@ GKeyFile *__connman_storage_load_config(const char *ident)
 	gchar *pathname;
 	GKeyFile *keyfile = NULL;
 
-	pathname = g_strdup_printf("%s/%s.config", STORAGEDIR, ident);
+	pathname = g_strdup_printf("%s/%s.config", storage_dir, ident);
 	if (!pathname)
 		return NULL;
 
@@ -150,7 +154,7 @@ GKeyFile *__connman_storage_load_provider_config(const char *ident)
 	gchar *pathname;
 	GKeyFile *keyfile = NULL;
 
-	pathname = g_strdup_printf("%s/%s.config", VPN_STORAGEDIR, ident);
+	pathname = g_strdup_printf("%s/%s.config", storage_vpn_dir, ident);
 	if (!pathname)
 		return NULL;
 
@@ -171,7 +175,7 @@ gchar **connman_storage_get_services(void)
 	struct stat buf;
 	int ret;
 
-	dir = opendir(STORAGEDIR);
+	dir = opendir(storage_dir);
 	if (!dir)
 		return NULL;
 
@@ -190,7 +194,7 @@ gchar **connman_storage_get_services(void)
 			 * If the settings file is not found, then
 			 * assume this directory is not a services dir.
 			 */
-			str = g_strdup_printf("%s/%s/settings", STORAGEDIR,
+			str = g_strdup_printf("%s/%s/settings", storage_dir,
 								d->d_name);
 			ret = stat(str, &buf);
 			g_free(str);
@@ -223,7 +227,7 @@ GKeyFile *connman_storage_load_service(const char *service_id)
 	gchar *pathname;
 	GKeyFile *keyfile = NULL;
 
-	pathname = g_strdup_printf("%s/%s/%s", STORAGEDIR, service_id, SETTINGS);
+	pathname = g_strdup_printf("%s/%s/%s", storage_dir, service_id, SETTINGS);
 	if (!pathname)
 		return NULL;
 
@@ -238,7 +242,7 @@ int __connman_storage_save_service(GKeyFile *keyfile, const char *service_id)
 	int ret = 0;
 	gchar *pathname, *dirname;
 
-	dirname = g_strdup_printf("%s/%s", STORAGEDIR, service_id);
+	dirname = g_strdup_printf("%s/%s", storage_dir, service_id);
 	if (!dirname)
 		return -ENOMEM;
 
@@ -268,7 +272,7 @@ static bool remove_file(const char *service_id, const char *file)
 	gchar *pathname;
 	bool ret = false;
 
-	pathname = g_strdup_printf("%s/%s/%s", STORAGEDIR, service_id, file);
+	pathname = g_strdup_printf("%s/%s/%s", storage_dir, service_id, file);
 	if (!pathname)
 		return false;
 
@@ -288,7 +292,7 @@ static bool remove_dir(const char *service_id)
 	gchar *pathname;
 	bool ret = false;
 
-	pathname = g_strdup_printf("%s/%s", STORAGEDIR, service_id);
+	pathname = g_strdup_printf("%s/%s", storage_dir, service_id);
 	if (!pathname)
 		return false;
 
@@ -321,7 +325,7 @@ bool __connman_storage_remove_service(const char *service_id)
 	if (!removed)
 		return false;
 
-	DBG("Removed service dir %s/%s", STORAGEDIR, service_id);
+	DBG("Removed service dir %s/%s", storage_dir, service_id);
 
 	return true;
 }
@@ -331,7 +335,7 @@ GKeyFile *__connman_storage_load_provider(const char *identifier)
 	gchar *pathname;
 	GKeyFile *keyfile;
 
-	pathname = g_strdup_printf("%s/%s_%s/%s", STORAGEDIR, "provider",
+	pathname = g_strdup_printf("%s/%s_%s/%s", storage_dir, "provider",
 			identifier, SETTINGS);
 	if (!pathname)
 		return NULL;
@@ -346,7 +350,7 @@ void __connman_storage_save_provider(GKeyFile *keyfile, const char *identifier)
 {
 	gchar *pathname, *dirname;
 
-	dirname = g_strdup_printf("%s/%s_%s", STORAGEDIR,
+	dirname = g_strdup_printf("%s/%s_%s", storage_dir,
 			"provider", identifier);
 	if (!dirname)
 		return;
@@ -388,7 +392,7 @@ bool __connman_storage_remove_provider(const char *identifier)
 		return false;
 
 	if (remove_all(id))
-		DBG("Removed provider dir %s/%s", STORAGEDIR, id);
+		DBG("Removed provider dir %s/%s", storage_dir, id);
 
 	g_free(id);
 
@@ -397,7 +401,7 @@ bool __connman_storage_remove_provider(const char *identifier)
 		return false;
 
 	if ((removed = remove_all(id)))
-		DBG("Removed vpn dir %s/%s", STORAGEDIR, id);
+		DBG("Removed vpn dir %s/%s", storage_dir, id);
 
 	g_free(id);
 
@@ -416,7 +420,7 @@ gchar **__connman_storage_get_providers(void)
 	char **providers;
 	GSList *iter;
 
-	dir = opendir(STORAGEDIR);
+	dir = opendir(storage_dir);
 	if (!dir)
 		return NULL;
 
@@ -427,7 +431,7 @@ gchar **__connman_storage_get_providers(void)
 			continue;
 
 		if (d->d_type == DT_DIR) {
-			str = g_strdup_printf("%s/%s/settings", STORAGEDIR,
+			str = g_strdup_printf("%s/%s/settings", storage_dir,
 					d->d_name);
 			ret = stat(str, &buf);
 			g_free(str);
@@ -452,3 +456,53 @@ gchar **__connman_storage_get_providers(void)
 
 	return providers;
 }
+
+char *connman_storage_dir(void)
+{
+	return storage_dir;
+}
+
+char *connman_storage_vpn_dir(void)
+{
+	return storage_vpn_dir;
+}
+
+int connman_storage_init(char *dir, char *vpn_dir)
+{
+	int err;
+
+	if (dir)
+		storage_dir = g_strdup(dir);
+	else
+		storage_dir = g_strdup(STORAGEDIR);
+
+	if (vpn_dir)
+		storage_vpn_dir = g_strdup(vpn_dir);
+	else
+		storage_vpn_dir = g_strdup(VPN_STORAGEDIR);
+
+	if (mkdir(storage_dir, MODE) < 0) {
+		err = errno;
+		if (err != EEXIST) {
+			perror("Failed to create storage directory");
+			return err;
+		}
+	}
+
+	if (mkdir(storage_vpn_dir, MODE) < 0) {
+		err = errno;
+		if (err != EEXIST) {
+			perror("Failed to create VPN storage directory");
+			return err;
+		}
+	}
+
+	return 0;
+}
+
+void connman_storage_cleanup(void)
+{
+	g_free(storage_dir);
+	g_free(storage_vpn_dir);
+}
+

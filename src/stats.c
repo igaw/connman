@@ -34,6 +34,7 @@
 #include <limits.h>
 #include <sys/stat.h>
 
+#include <connman/storage.h>
 #include "connman.h"
 
 #define MODE		(S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | \
@@ -345,7 +346,7 @@ static int stats_open(struct stats_file *file,
 static int stats_open_temp(struct stats_file *file)
 {
 	file->name = g_strdup_printf("%s/stats.XXXXXX.tmp",
-					STORAGEDIR);
+				connman_storage_dir());
 	file->fd = g_mkstemp_full(file->name, O_RDWR | O_CREAT, 0644);
 	if (file->fd < 0) {
 		connman_error("create temporary file error %s for %s",
@@ -676,7 +677,7 @@ int __connman_stats_service_register(struct connman_service *service)
 
 	DBG("service %p", service);
 
-	dir = g_strdup_printf("%s/%s", STORAGEDIR,
+	dir = g_strdup_printf("%s/%s", connman_storage_dir(),
 				connman_service_get_identifier(service));
 
 	/* If the dir doesn't exist, create it */
@@ -705,9 +706,10 @@ int __connman_stats_service_register(struct connman_service *service)
 		return -EALREADY;
 	}
 
-	name = g_strdup_printf("%s/%s/data", STORAGEDIR,
+	name = g_strdup_printf("%s/%s/data", connman_storage_dir(),
 				connman_service_get_identifier(service));
-	file->history_name = g_strdup_printf("%s/%s/history", STORAGEDIR,
+	file->history_name = g_strdup_printf("%s/%s/history",
+				connman_storage_dir(),
 				connman_service_get_identifier(service));
 
 	/* TODO: Use a global config file instead of hard coded value. */

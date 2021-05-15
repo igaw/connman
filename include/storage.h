@@ -28,6 +28,11 @@
 extern "C" {
 #endif
 
+int connman_storage_init(char *dir, char *vpn_dir);
+void connman_storage_cleanup(void);
+char *connman_storage_dir(void);
+char *connman_storage_vpn_dir(void);
+
 gchar **connman_storage_get_services();
 GKeyFile *connman_storage_load_service(const char *service_id);
 

@@ -37,6 +37,7 @@
 
 #include <gdbus.h>
 
+#include <connman/storage.h>
 #include "connman.h"
 
 #define CONF_ARRAY_SIZE(x) (sizeof(x)/sizeof(x[0]) - 1)
@@ -660,6 +661,8 @@ static void disconnect_callback(DBusConnection *conn, void *user_data)
 }
 
 static gchar *option_config = NULL;
+static gchar *option_storage_dir = NULL;
+static gchar *option_storage_vpn_dir = NULL;
 static gchar *option_debug = NULL;
 static gchar *option_device = NULL;
 static gchar *option_plugin = NULL;
@@ -710,6 +713,12 @@ static GOptionEntry options[] = {
 	{ "config", 'c', 0, G_OPTION_ARG_STRING, &option_config,
 				"Load the specified configuration file "
 				"instead of " CONFIGMAINFILE, "FILE" },
+	{ "storage_dir", 'D', 0, G_OPTION_ARG_STRING, &option_storage_dir,
+				"Use DIR for persistent state information. "
+				"Default is " STORAGEDIR, "DIR" },
+	{ "storage_vpn_dir", 'V', 0, G_OPTION_ARG_STRING, &option_storage_vpn_dir,
+				"Use DIR for VPN persistent state information. "
+				"Default is " VPN_STORAGEDIR, "DIR" },
 	{ "debug", 'd', G_OPTION_FLAG_OPTIONAL_ARG,
 				G_OPTION_ARG_CALLBACK, parse_debug,
 				"Specify debug options to enable", "DEBUG" },
@@ -885,11 +894,12 @@ int main(int argc, char *argv[])
 		}
 	}
 
-	if (mkdir(STORAGEDIR, S_IRUSR | S_IWUSR | S_IXUSR |
-				S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH) < 0) {
-		if (errno != EEXIST)
-			perror("Failed to create storage directory");
-	}
+	if (!option_config)
+		config_init(CONFIGMAINFILE);
+	else
+		config_init(option_config);
+
+	connman_storage_init(option_storage_dir, option_storage_vpn_dir);
 
 	umask(0077);
 
@@ -915,11 +925,6 @@ int main(int argc, char *argv[])
 			option_backtrace, "Connection Manager", VERSION);
 
 	__connman_dbus_init(conn);
-
-	if (!option_config)
-		config_init(CONFIGMAINFILE);
-	else
-		config_init(option_config);
 
 	__connman_util_init();
 	__connman_inotify_init();
@@ -964,6 +969,8 @@ int main(int argc, char *argv[])
 	__connman_machine_init();
 
 	g_free(option_config);
+	g_free(option_storage_dir);
+	g_free(option_storage_vpn_dir);
 	g_free(option_device);
 	g_free(option_plugin);
 	g_free(option_nodevice);
@@ -1014,6 +1021,7 @@ int main(int argc, char *argv[])
 	__connman_dbus_cleanup();
 
 	__connman_log_cleanup(option_backtrace);
+	connman_storage_cleanup();
 
 	dbus_connection_unref(conn);
 
