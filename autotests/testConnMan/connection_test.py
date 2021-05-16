@@ -9,6 +9,7 @@ from iwd import IWD
 from iwd import NetworkType
 from connman import ConnMan
 import testutil
+import pprint
 
 class Test(unittest.TestCase):
 
@@ -17,9 +18,13 @@ class Test(unittest.TestCase):
         man = cm.get_manager()
         print(man)
 
-        #services = man.get_services()
-        for service in man.get_services():
-            print(service)
+        # for service in man.get_services():
+        #     print(service)
+        #     pprint.pprint(dict((x, getattr(service, x)) for x in service.__class__.__dict__ if isinstance(service.__class__.__dict__[x], property)))
+
+
+        service = cm.get_service_by_name('ssidOpen')
+        print(service)
 
         # wd = IWD()
 

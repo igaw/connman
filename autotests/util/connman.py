@@ -325,6 +325,8 @@ class Service(ConnManDBusAbstract):
     '''
     _iface_name = CONNMAN_SERVICE_INTERFACE
 
+    # XXX add missing setters and signal handlers
+
     def __init__(self, *args, **kwargs):
         ConnManDBusAbstract.__init__(self, *args, **kwargs)
 
@@ -767,6 +769,27 @@ class Manager(ConnManDBusAbstract):
     '''Class represents a manager object: net.connman.Manager'''
     _iface_name = CONNMAN_MANAGER_INTERFACE
 
+    # XXX add missing methods and signal handling
+
+    def __init__(self, *args, **kwargs):
+        ConnManDBusAbstract.__init__(self, *args, **kwargs)
+
+        self._iface.connect_to_signal("ServicesChanged",
+                                      self._services_changed_handler,
+                                      CONNMAN_SERVICE,
+                                      path_keyword="path")
+
+        self._services = {}
+        for bus_obj, props in self._iface.GetServices():
+            self._services[bus_obj] = Service(bus_obj, properties=props)
+
+    def _services_changed_handler(self, added, removed):
+        for bus_obj, props in added.items():
+            self._services[bus_obj] = Service(bus_obj, properties=props)
+
+        for bus_obj in removed:
+            self._services.pop(bus_obj)
+
     @property
     def path(self):
         '''
@@ -794,7 +817,6 @@ class Manager(ConnManDBusAbstract):
         '''
         return bool(self._properties['OfflineMode'])
 
-
     def get_services(self):
         services = []
         for bus_obj, props in self._iface.GetServices():
@@ -818,7 +840,6 @@ class ConnMan(AsyncOpAbstract):
     _manager = None
     _connman_proc = None
     _default_instance = None
-    _services = None
 
     def __init__(self, start_connman_daemon = False, connman_config_dir = '/tmp',
                             connman_storage_dir = '/tmp/connman', namespace=ctx):
@@ -861,7 +882,7 @@ class ConnMan(AsyncOpAbstract):
 
         self.namespace = None
 
-    def get_manager(self):
+    def get_manager(self, max_wait=50):
         if self._manager:
             return self._manager
 
@@ -882,6 +903,33 @@ class ConnMan(AsyncOpAbstract):
                 GLib.source_remove(timeout)
 
         return self._manager
+
+    def get_service_by_name(self, name, max_wait=50):
+        self._wait_timed_out = False
+        def wait_timeout_cb():
+            self._wait_timed_out = True
+            return False
+
+        def lookup_service_by_name(name):
+            print('try to lookup Service with name \"' + name + '\"')
+            for bus_obj, service in self._manager._services.items():
+                if service.name == name:
+                    return s;
+                return None
+
+        try:
+            timeout = GLib.timeout_add_seconds(max_wait, wait_timeout_cb)
+            context = ctx.mainloop.get_context()
+            while not lookup_service_by_name(name):
+                context.iteration(may_block=True)
+                if self._wait_timed_out:
+                    raise TimeoutError('IWD has no associated devices')
+                time.sleep(1)
+        finally:
+            if not self._wait_timed_out:
+                GLib.source_remove(timeout)
+
+        return self.lookup_service_by_name(name)
 
     @staticmethod
     def _wait_for_object_condition(obj, condition_str, max_wait = 50):
