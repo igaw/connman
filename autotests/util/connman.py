@@ -124,8 +124,8 @@ class ConnManDBusAbstract(AsyncOpAbstract):
         self._namespace = namespace
 
         self._object_path = object_path
-        self.proxy = self._bus.get_object(service, self._object_path)
-        self._iface = dbus.Interface(self.proxy, self._iface_name)
+        self._proxy = self._bus.get_object(service, self._object_path)
+        self._iface = dbus.Interface(self._proxy, self._iface_name)
 
         if properties is None:
             self._properties = self._iface.GetProperties()
@@ -198,7 +198,7 @@ class SecurityType(Enum):
         return str(self.value)
 
     @classmethod
-    def from_string(cls, string):
+    def from_str(cls, string):
         type = None
         for attr in dir(cls):
             if (str(getattr(cls, attr)) == string):
@@ -222,7 +222,7 @@ class ErrorType(Enum):
         return str(self.value)
 
     @classmethod
-    def from_string(cls, string):
+    def from_str(cls, string):
         type = None
         for attr in dir(cls):
             if (str(getattr(cls, attr)) == string):
@@ -237,6 +237,78 @@ class ManagerState(Enum):
     offline =       'offline'
     ready =         'ready'
     online =        'online'
+
+    def __str__(self):
+        return self.value
+
+    @classmethod
+    def from_str(cls, string):
+        return getattr(cls, string, None)
+
+
+class IPv4Method(Enum):
+    '''IPv4 methods'''
+    dhcp =   'dhcp'
+    manual = 'manual'
+    auto =   'auto'
+    off =    'off'
+
+    def __str__(self):
+        return self.value
+
+    @classmethod
+    def from_str(cls, string):
+        return getattr(cls, string, None)
+
+
+class IPv6Method(Enum):
+    '''IPv6 methods'''
+    auto =        'auto'
+    manual =      'manual'
+    sixtofour =   '6to4'
+    off =         'off'
+
+    def __str__(self):
+        return self.value
+
+    @classmethod
+    def from_str(cls, string):
+        return getattr(cls, string, None)
+
+
+class IPv6Privacy(Enum):
+    '''IPv6 privacy extension'''
+    auto =        'auto'
+    disabled =    'disabled'
+    enabled =     'enabled'
+    preferred =   'preferred'
+
+    def __str__(self):
+        return self.value
+
+    @classmethod
+    def from_str(cls, string):
+        return getattr(cls, string, None)
+
+
+class ProxyMethod(Enum):
+    '''Proxy methods'''
+    direct =      'direct'
+    auto =        'auto'
+    manual =      'manual'
+
+    def __str__(self):
+        return self.value
+
+    @classmethod
+    def from_str(cls, string):
+        return getattr(cls, string, None)
+
+
+class EthernetMethod(Enum):
+    '''Ethernet method'''
+    auto =        'auto'
+    manual =      'manual'
 
     def __str__(self):
         return self.value
@@ -263,7 +335,7 @@ class Service(ConnManDBusAbstract):
 
             @rtype: string
         '''
-        return self._object_path
+        return str(self._object_path)
 
     @property
     def state(self):
@@ -281,7 +353,9 @@ class Service(ConnManDBusAbstract):
 
             @rtype: object (Error)
         '''
-        return ErrorType.from_str(self._properties['Error'])
+        if 'Error' in self._properties:
+            return ErrorType.from_str(self._properties['Error'])
+        return None
 
     @property
     def name(self):
@@ -290,7 +364,7 @@ class Service(ConnManDBusAbstract):
 
             @rtype: string
         '''
-        return self._properties['Name']
+        return str(self._properties['Name'])
 
     @property
     def type(self):
@@ -306,9 +380,12 @@ class Service(ConnManDBusAbstract):
         '''
             Service's security type.
 
-            @rtype: object (Security)
+            @rtype: array object (Security)
         '''
-        return SecurityType.from_str(self._properties['Security'])
+        security = []
+        for p in self._properties['Security']:
+            security.append(SecurityType.from_str(p))
+        return security
 
     @property
     def strength(self):
@@ -317,7 +394,9 @@ class Service(ConnManDBusAbstract):
 
             @rtype: number
         '''
-        return int(self._properties['Strength'])
+        if self.type is not ServiceType.ethernet:
+            return int(self._properties['Strength'])
+        return None
 
     @property
     def favorite(self):
@@ -354,9 +433,257 @@ class Service(ConnManDBusAbstract):
 
             @rtype: boolean
         '''
-        return bool(self._properties['Roaming'])
+        if self.type is ServiceType.cellular:
+            return bool(self._properties['Roaming'])
+        return None
 
-    # XXX add missing complex properites
+    @property
+    def nameservers(self):
+        '''
+            Service's currently active nameservers.
+
+            @rtype: array string
+        '''
+        nameservers = []
+        for p in self._properties['Nameservers']:
+            nameservers.append(str(p))
+        return nameservers
+
+    @property
+    def nameservers_configuration(self):
+        '''
+            Service's list of manually configured nameservers.
+
+            @rtype: array string
+        '''
+        nameservers = []
+        for p in self._properties['Nameservers.Configuration']:
+            nameservers.append(str(p))
+        return nameservers
+
+    @property
+    def timerservers(self):
+        '''
+            Service's currently active timerservers.
+
+            @rtype: array string
+        '''
+        timeservers = []
+        for p in self._properties['Timeservers']:
+            timeservers.append(str(p))
+        return timeservers
+
+    @property
+    def timerservers_configuration(self):
+        '''
+            Service's list of manually configured timerservers.
+
+            @rtype: array string
+        '''
+        timeservers = []
+        for p in self._properties['Timeservers.Configuration']:
+            timeservers.append(str(p))
+        return timeservers
+
+    @property
+    def domains(self):
+        '''
+            Service's currently active search domains.
+
+            @rtype: array string
+        '''
+        domains = []
+        for p in self._properties['Domains']:
+            domains.append(str(p))
+        return domains
+
+    @property
+    def domains_configured(self):
+        '''
+            Service's list of manually configured search domains.
+
+            @rtype: array string
+        '''
+        domains = []
+        for p in self._properties['Domains.Configuration']:
+            domains.append(str(p))
+        return domains
+
+    @property
+    def ipv4(self):
+        '''
+            Service's IPv4 active settings.
+
+            @rtype: dictionary
+        '''
+        ipv4 = {}
+        p = self._properties['IPv4']
+        ipv4['method'] = IPv4Method.from_str(p['Method'])
+        ipv4['address'] = str(p['Address'])
+        ipv4['netmask'] = str(p['Netmask'])
+        if 'Gateway' in p:
+            ipv4['gateway'] = str(p['Gateway'])
+        return ipv4
+
+    @property
+    def ipv4_configuration(self):
+        '''
+            Service's IPv4 configuration.
+
+            @rtype: dictionary
+        '''
+        ipv4 = {}
+        p = self._properties['IPv4']
+        ipv4['method'] = IPv4Method.from_str(p['Method'])
+        ipv4['address'] = str(p['Address'])
+        ipv4['netmask'] = str(p['Netmask'])
+        if 'Gateway' in p:
+            ipv4['gateway'] = str(p['Gateway'])
+        return ipv4
+
+    @property
+    def ipv6(self):
+        '''
+            Service's IPv6 active settings.
+
+            @rtype: dictionary
+        '''
+        ipv6 = {}
+        p = self._properties['IPv6']
+        if len(p) == 0:
+            return ipv6
+        ipv6['method'] = IPv6Method.from_str(p['Method'])
+        ipv6['address'] = str(p['Address'])
+        ipv6['prefix_length'] = int(p['PrefixLength'])
+        ipv6['gateway'] = str(p['Gateway'])
+        ipv6['privacy'] = IPv6Privacy.from_str(p['Privacy'])
+        return ipv6
+
+    @property
+    def ipv6_configuration(self):
+        '''
+            Service's IPv6 configuration.
+
+            @rtype: dictionary
+        '''
+        ipv6 = {}
+        p = self._properties['IPv6']
+        if len(p) == 0:
+            return ipv6
+        ipv6['method'] = IPv6Method.from_str(p['Method'])
+        ipv6['address'] = str(p['Address'])
+        ipv6['prefix_length'] = int(p['PrefixLength'])
+        ipv6['gateway'] = str(p['Gateway'])
+        ipv6['privacy'] = IPv6Privacy.from_str(p['Privacy'])
+        return ipv6
+
+    @property
+    def proxy(self):
+        '''
+            Service's proxy active settings.
+
+            @rtype: dictionary
+        '''
+        proxy = {}
+        p = self._properties['Proxy']
+        if len(p) == 0:
+            return proxy
+        proxy['method'] = ProxyMethod.from_str(p['Method'])
+        if proxy['method'] == ProxyMethod.auto:
+            proxy['url'] = str(p['URL'])
+        if proxy['method'] == ProxyMethod.manual:
+            servers = []
+            for s in p['Servers']:
+                servers.append(str(s))
+            proxy['servers'] = servers
+            excludes = []
+            for s in p['Excludes']:
+                servers.append(str(s))
+            proxy['excludes'] = excludes
+        return proxy
+
+    @property
+    def proxy_configuration(self):
+        '''
+            Service's proxy configuration.
+
+            @rtype: dictionary
+        '''
+        proxy = {}
+        p = self._properties['Proxy']
+        if len(p) == 0:
+            return proxy
+        proxy['method'] = ProxyMethod.from_str(p['Method'])
+        if proxy['method'] == ProxyMethod.auto:
+            proxy['url'] = str(p['URL'])
+        if proxy['method'] == ProxyMethod.manual:
+            servers = []
+            for s in p['Servers']:
+                servers.append(str(s))
+            proxy['servers'] = servers
+            excludes = []
+            for s in p['Excludes']:
+                servers.append(str(s))
+            proxy['excludes'] = excludes
+        return proxy
+
+    @property
+    def provider(self):
+        '''
+            Service's provider settings.
+
+            @rtype: dictionary
+        '''
+        provider = {}
+        p = self._properties['Provider']
+        if len(p) == 0:
+            return provider
+        provider['host'] = str(p['Host'])
+        provider['domain'] = str(p['Domain'])
+        provider['name'] = str(p['Name'])
+        provider['type'] = str(p['Type'])
+        return provider
+
+    @property
+    def ethernet(self):
+        '''
+            Service's ethernet settings.
+
+            @rtype: dictionary
+        '''
+        eth = {}
+        p = self._properties['Ethernet']
+        eth['method'] = EthernetMethod.from_str(p['Method'])
+        eth['interface'] = str(p['Interface'])
+        eth['address'] = str(p['Address'])
+        eth['mtu'] = int(p['MTU'])
+
+    @property
+    def mdsn(self):
+        '''
+            True if service is mDNS is enabled.
+
+            @rtype: boolean
+        '''
+        return bool(self._properties['mDNS'])
+
+    @property
+    def last_address_conflict(self):
+        '''
+            Service's information on the IPv4 address
+            conflicts.
+
+            @rtype: dictionary
+        '''
+        if 'LastAddressConflict' not in self._properties:
+            return None
+
+        info = {}
+        p = self._properties['LastAddressConflict']
+        info['ipv4'] = { 'address': str(p['IPv4']['Address']) }
+        info['ethernet'] = { 'address': str(p['Ethernet']['Address']) }
+        info['timestamp'] = int(p['Timestamp'])
+        info['resolved'] = bool(p['Resolved'])
 
     def connect(self):
         '''Connect this service.
@@ -430,7 +757,10 @@ class Service(ConnManDBusAbstract):
     def __str__(self, prefix = ''):
         return prefix + 'Service: ' + self.path + '\n'\
                + prefix + '\tName:\t\t' + self.name + '\n'\
-               + prefix + '\tState:\t\t' + str(self.state) + '\n'
+               + prefix + '\tType:\t\t' + str(self.type) + '\n'\
+               + prefix + '\tState:\t\t' + str(self.state) + '\n'\
+               + prefix + '\tFavorite:\t' + str(self.favorite) + '\n'\
+               + prefix + '\tAutoConnect:\t' + str(self.autoconnect) + '\n'
 
 
 class Manager(ConnManDBusAbstract):
