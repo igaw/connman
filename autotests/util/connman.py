@@ -56,7 +56,7 @@ class OperationCanceledEx(dbus.DBusException): pass
 class OperationTimeoutEx(dbus.DBusException): pass
 class PassphraseRequiredEx(dbus.DBusException): pass
 class PermissionDeniedEx(dbus.DBusException): pass
-
+class UnknownDBusEx(Exception): pass
 
 _dbus_ex_to_py = {
     'AlreadyConnected' :    AlreadyConnectedEx,
@@ -134,13 +134,12 @@ class ConnManDBusAbstract(AsyncOpAbstract):
 
         self._iface.connect_to_signal("PropertyChanged",
                                       self._property_changed_handler,
-                                      service,
                                       path_keyword="path")
 
-    def _property_changed_handler(self, interface, changed, invalidated, path):
-        if interface == self._iface_name and path == self._object_path:
-            for name, value in changed.items():
-                self._properties[name] = value
+
+    def _property_changed_handler(self, name, value, path):
+        if path == self._object_path:
+            self._properties[name] = value
 
     @abstractmethod
     def __str__(self):
@@ -694,7 +693,8 @@ class Service(ConnManDBusAbstract):
         '''
         self._iface.Connect(dbus_interface=CONNMAN_SERVICE_INTERFACE,
                                reply_handler=self._success,
-                               error_handler=self._failure)
+                               error_handler=self._failure,
+                               timeout=60000)
 
         self._wait_for_async_op()
 
@@ -715,7 +715,7 @@ class Service(ConnManDBusAbstract):
 
            Possible exception: InvalidArgumentsEx
         '''
-        self._iface.Remove(dbus_interface=CONNMAM_SERVICE_INTERFACE,
+        self._iface.Remove(dbus_interface=CONNMAN_SERVICE_INTERFACE,
                                reply_handler=self._success,
                                error_handler=self._failure)
 
@@ -726,7 +726,7 @@ class Service(ConnManDBusAbstract):
 
            Possible exception: InvalidArgumentsEx
         '''
-        self._iface.MoveBevore(dbus_interface=CONNMAM_SERVICE_INTERFACE,
+        self._iface.MoveBefore(dbus_interface=CONNMAN_SERVICE_INTERFACE,
                                service=other,
                                reply_handler=self._success,
                                error_handler=self._failure)
@@ -738,19 +738,19 @@ class Service(ConnManDBusAbstract):
 
            Possible exception: InvalidArgumentsEx
         '''
-        self._iface.MoveAfter(dbus_interface=CONNMAM_SERVICE_INTERFACE,
+        self._iface.MoveAfter(dbus_interface=CONNMAN_SERVICE_INTERFACE,
                                service=other,
                                reply_handler=self._success,
                                error_handler=self._failure)
 
         self._wait_for_async_op()
 
-    def reset_counters(self, other):
+    def reset_counters(self):
         '''Reset the counter statistics.
 
            Possible exception: None
         '''
-        self._iface.ResetCounters(dbus_interface=CONNMAM_SERVICE_INTERFACE,
+        self._iface.ResetCounters(dbus_interface=CONNMAN_SERVICE_INTERFACE,
                                reply_handler=self._success,
                                error_handler=self._failure)
 
@@ -775,20 +775,21 @@ class Manager(ConnManDBusAbstract):
         ConnManDBusAbstract.__init__(self, *args, **kwargs)
 
         self._iface.connect_to_signal("ServicesChanged",
-                                      self._services_changed_handler,
-                                      CONNMAN_SERVICE,
-                                      path_keyword="path")
+                                      self._services_changed_handler)
 
         self._services = {}
         for bus_obj, props in self._iface.GetServices():
             self._services[bus_obj] = Service(bus_obj, properties=props)
 
     def _services_changed_handler(self, added, removed):
-        for bus_obj, props in added.items():
+        for bus_obj, props in added:
+            if bus_obj in self._services:
+                # XXX udpate properties
+                continue
             self._services[bus_obj] = Service(bus_obj, properties=props)
 
         for bus_obj in removed:
-            self._services.pop(bus_obj)
+            del self._services[bus_obj]
 
     @property
     def path(self):
@@ -911,11 +912,10 @@ class ConnMan(AsyncOpAbstract):
             return False
 
         def lookup_service_by_name(name):
-            print('try to lookup Service with name \"' + name + '\"')
             for bus_obj, service in self._manager._services.items():
                 if service.name == name:
-                    return s;
-                return None
+                    return service;
+            return None
 
         try:
             timeout = GLib.timeout_add_seconds(max_wait, wait_timeout_cb)
@@ -923,13 +923,13 @@ class ConnMan(AsyncOpAbstract):
             while not lookup_service_by_name(name):
                 context.iteration(may_block=True)
                 if self._wait_timed_out:
-                    raise TimeoutError('IWD has no associated devices')
-                time.sleep(1)
+                    raise TimeoutError('ConnMan has no associated devices')
+
         finally:
             if not self._wait_timed_out:
                 GLib.source_remove(timeout)
 
-        return self.lookup_service_by_name(name)
+        return lookup_service_by_name(name)
 
     @staticmethod
     def _wait_for_object_condition(obj, condition_str, max_wait = 50):
